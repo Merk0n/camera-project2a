@@ -76,14 +76,14 @@ def draw_cube(screen, cube_vertices, cube_edges, mvp_matrix, width, height, colo
 cube_vertices = np.array([[x, y, z, 1] for x in [-1, 1] for y in [-1, 1] for z in [-1, 1]])
 cube_edges = [(0, 1), (1, 3), (3, 2), (2, 0), (0, 4), (1, 5), (3, 7), (2, 6), (4, 5), (5, 7), (7, 6), (6, 4)]
 
-# Ustawienia początkowe kamery
-camera_pos = np.array([0.0, 0.0, -20.0])
-camera_angle = 0
-camera_pitch = 0
-camera_roll = 0
-camera_fov = np.pi / 4
-camera_speed = 0.5
-rotation_speed = 0.05
+# Struktura danych przechowująca pozycję i kolor każdego sześcianu
+cubes_info = [
+    {'position': (-5, 0, -5), 'color': (255, 0, 0)},    # Czerwony sześcian
+    {'position': (5, 0, -5), 'color': (0, 255, 0)},     # Zielony sześcian
+    {'position': (-5, 0, -10), 'color': (0, 0, 255)},   # Niebieski sześcian
+    {'position': (5, 0, -10), 'color': (255, 255, 0)}   # Żółty sześcian
+    # Możesz dodać więcej sześcianów i kolorów
+]
 
 # Aktualizacja macierzy widoku
 def update_view_matrix():
@@ -93,7 +93,14 @@ def update_view_matrix():
     translation = translation_matrix(*camera_pos)
     return np.linalg.inv(translation @ yaw_matrix @ pitch_matrix @ roll_matrix)
     
-colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+# Ustawienia początkowe kamery
+camera_pos = np.array([0.0, 0.0, -20.0])
+camera_angle = 0
+camera_pitch = 0
+camera_roll = 0
+camera_fov = np.pi / 4
+camera_speed = 0.5
+rotation_speed = 0.05
 
 # Główna pętla gry
 running = True
@@ -108,9 +115,9 @@ while running:
             if event.key == pygame.K_w:  # Tył
                 camera_pos += camera_speed * np.array([np.sin(camera_angle), 0, np.cos(camera_angle)])
             if event.key == pygame.K_d:  # Obrót w lewo
-                camera_angle += rotation_speed
+                camera_pos[0] += camera_speed
             if event.key == pygame.K_a:  # Obrót w prawo
-                camera_angle -= rotation_speed
+                camera_pos[0] -= camera_speed
             if event.key == pygame.K_q:
                 camera_roll += rotation_speed
             if event.key == pygame.K_e:
@@ -120,9 +127,9 @@ while running:
             if event.key == pygame.K_t:
                 camera_fov += 0.01
             if event.key == pygame.K_x:
-                camera_pitch += rotation_speed
+                camera_pos[1] -= camera_speed
             if event.key == pygame.K_z:
-                camera_pitch -= rotation_speed
+                camera_pos[1] += camera_speed
 
     screen.fill((0, 0, 0))  # Czyszczenie ekranu
 
@@ -130,26 +137,21 @@ while running:
     projection = perspective_matrix(camera_fov, width / height, 0.1, 1000)
     view_matrix = update_view_matrix()
 
-    # Lista do przechowywania sześcianów i ich odległości
+    # Obliczanie odległości sześcianów od kamery i sortowanie
     cubes_with_distance = []
+    for cube in cubes_info:
+        cube_center = np.array(cube['position'] + (1,))  # Dodanie współrzędnej homogenicznej
+        distance = calculate_distance(cube_center[:3], camera_pos[:3])
+        cubes_with_distance.append((distance, cube))
 
-    # Obliczanie odległości i sortowanie sześcianów
-    for z in [-5, -10]:
-        for x in [-5, 5]:
-            cube_center = np.array([x, 0, z, 1])  # Środek sześcianu
-            distance = calculate_distance(cube_center[:3], camera_pos[:3])
-            cubes_with_distance.append((distance, x, z))
-
-    # Sortowanie sześcianów według odległości (od najdalszych do najbliższych)
     cubes_with_distance.sort(key=lambda x: x[0], reverse=True)
 
-    # Rysowanie sześcianów
-    color_index = 0
-    for distance, x, z in cubes_with_distance:
-        model_matrix = translation_matrix(x, 0, z)
+    # Rysowanie sześcianów z przypisanymi kolorami
+    for distance, cube in cubes_with_distance:
+        x, y, z = cube['position']
+        model_matrix = translation_matrix(x, y, z)
         mvp_matrix = projection @ view_matrix @ model_matrix
-        draw_cube(screen, cube_vertices, cube_edges, mvp_matrix, width, height, colors[color_index % len(colors)])
-        color_index += 1
+        draw_cube(screen, cube_vertices, cube_edges, mvp_matrix, width, height, cube['color'])
 
     pygame.display.flip()  # Aktualizacja zawartości okna
     clock.tick(60)  # Utrzymanie stałej liczby klatek na sekundę
